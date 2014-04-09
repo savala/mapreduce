@@ -1,4 +1,0 @@
-stampreduce
-===========
-
-MapReduce for Stampede
