@@ -1,4 +1,6 @@
-stampreduce
-===========
-
 MapReduce for Stampede
+======================
+
+A C++ framework by Sai Avala and Sudheesh Katkam
+
+Documentation:
