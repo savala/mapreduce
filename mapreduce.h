@@ -6,14 +6,14 @@
 #include <utility>
 #include "mpi.h"
 
-#define MPI_ROOT 0
+#define ROOT 0
 
 enum JobType { MAPPER = 0, REDUCER = 1, DONE = 2 };
 
 using namespace std;
 
-template<K1, V1, K2, V2>
-class Master : public Handler {
+template<typename K1, typename V1, typename K2, typename V2>
+class Master {
     private:
         vector<pair<K1, V1> > _map_container;
         map<K2,  vector<V2> > _reduce_container;
@@ -24,13 +24,13 @@ class Master : public Handler {
         Master() :
             _map_container(vector<pair<K1, V1> >()),
             _reduce_container(map<K2,  vector<V2> >()),
-            _result_container(vector<pair<K2, V2>()),
+            _result_container(vector<pair<K2, V2> >()),
             _free_processor(1)
         { }
         
-        virtual initialize();
+        virtual void initialize();
 
-        virtual finalize() const;
+        virtual void finalize() const;
 
         void run() {
             MPI_Init(NULL, NULL);
@@ -44,7 +44,7 @@ class Master : public Handler {
             while(task < msize) {
 
                 err = MPI_Send(MAPPER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&_map_container[task], 1, , _free_processor, 0, MPI_COMM_WORLD);
+                err = MPI_Send(&_map_container[task], 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
                 
                 task++;
                 _free_processor++;
@@ -53,9 +53,9 @@ class Master : public Handler {
                     pair<K2, V2> contribution;
 
                     for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, , i, 0, MPI_COMM_WORLD, &status);
+                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
                         if(_reduce_container.count(contribution[0]) == 0) {
-                            _reduce_container[contribution[0]]();
+                            _reduce_container[contribution[0]](vector<V2>());
                         }
                         _reduce_container[contribution[0]].append(contribution[1]);
                     }
@@ -81,7 +81,7 @@ class Master : public Handler {
             while(task < rsize) {
 
                 err = MPI_Send(REDUCER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&_reduce_container[task], 1, ,_free_processor, 0, MPI_COMM_WORLD);
+                err = MPI_Send(&_reduce_container[task], 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
 
                 task++;
                 _free_processor++;
@@ -90,7 +90,7 @@ class Master : public Handler {
                     pair<K2, V2> contribution;
 
                     for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, , i, 0, MPI_COMM_WORLD, &status);
+                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
                         _result_container.append(contribution);
                     }
                     _free_processor = 1;
@@ -102,7 +102,7 @@ class Master : public Handler {
                 MPI_Status status;
                 pair<K2, V2> contribution;
 
-                err = MPI_Recv(&contribution. 1, , i, 0, MPI_COMM_WORLD, &status);
+                err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
                 _result_container.append(contribution);
             }
         }
@@ -110,7 +110,7 @@ class Master : public Handler {
         virtual ~Master();
 };
 
-class Worker : public Handler {
+class Worker {
     public:
         Worker();
 
@@ -118,7 +118,7 @@ class Worker : public Handler {
 
 };
 
-template<K1, V1, K2, V2>
+template<typename K1, typename V1, typename K2, typename V2>
 class Mapper : public Worker {
     private:       
 
@@ -130,7 +130,7 @@ class Mapper : public Worker {
         virtual ~Mapper();
 };
 
-template<K2, V2>
+template<typename K2, typename V2>
 class Reducer : public Worker {
     private:
 
@@ -142,30 +142,31 @@ class Reducer : public Worker {
         virtual ~Reducer();
 };
 
+template<typename K1, typename V1, typename K2, typename V2>
 class JobClient {
     public:
         
-        void run(Master m, Mapper t, Reducer r) {
+        void run(Master<K1, V1, K2, V2> m, Mapper<K1, V1, K2, V2> t, Reducer<K2, V2> r) {
             MPI_Init(NULL, NULL);
             int rank, size;
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             MPI_Comm_size(MPI_COMM_WORLD, &size);
             
-            if (rank == MPI_ROOT) {
+            if (rank == ROOT) {
                 m.run();
             } else {
                 wait_for_work(t, r);
             }
         }
 
-        void wait_for_work(Mapper m, Reducer r) {
+        void wait_for_work(Mapper<K1, V1, K2, V2> m, Reducer<K2, V2> r) {
             bool done = false;
             while(!done) {
                 int err;
                 MPI_Status s;
                 JobType w;
 
-                err = MPI_Recv(&w, 1, MPI_INT, MPI_ROOT, 0, MPI_COMM_WORLD, &s);
+                err = MPI_Recv(&w, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &s);
                 switch(w) {
                     case MAPPER     : m.map();     break;
                     case REDUCER    : r.reduce();  break;
