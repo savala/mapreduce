@@ -3,4 +3,4 @@ mapreduce: mapreduce.h mapreduce.cxx
 
 example: mapreduce.h mapreduce.cxx example.cxx
 	mpicxx -g -O2 -c example.cxx
-	mpicxx -g -O2 example.o -o example
+	mpicxx -g -O2 example.o -o example.out
