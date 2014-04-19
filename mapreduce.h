@@ -2,6 +2,7 @@
 #define Mapreduce_h
 
 #include <vector>
+#include <map>
 #include <utility>
 #include "mpi.h"
 
@@ -15,17 +16,21 @@ template<K1, V1, K2, V2>
 class Master : public Handler {
     private:
         vector<pair<K1, V1> > _map_container;
-        vector<pair<K2, V2> > _reduce_container;
+        map<K2,  vector<V2> > _reduce_container;
+        vector<pair<K2, V2> > _result_container;
         int _free_processor;
     
     public:
-        void initialize() {
+        Master() :
+            _map_container(vector<pair<K1, V1> >()),
+            _reduce_container(map<K2,  vector<V2> >()),
+            _result_container(vector<pair<K2, V2>()),
+            _free_processor(1)
+        { }
+        
+        virtual initialize();
 
-        }
-
-        void finalize() {
-
-        }
+        virtual finalize() const;
 
         void run() {
             MPI_Init(NULL, NULL);
@@ -37,10 +42,9 @@ class Master : public Handler {
             int msize = _map_container.size();
             // MAP WORK
             while(task < msize) {
-                MPI_Status s;
 
                 err = MPI_Send(MAPPER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&_map_container[i], 1, , _free_processor, 0, MPI_COMM_WORLD);
+                err = MPI_Send(&_map_container[task], 1, , _free_processor, 0, MPI_COMM_WORLD);
                 
                 task++;
                 _free_processor++;
@@ -50,12 +54,60 @@ class Master : public Handler {
 
                     for (int i = 1; i < size; ++i) {
                         err = MPI_Recv(&contribution, 1, , i, 0, MPI_COMM_WORLD, &status);
-                        _reduce_container.append(contribution);
+                        if(_reduce_container.count(contribution[0]) == 0) {
+                            _reduce_container[contribution[0]]();
+                        }
+                        _reduce_container[contribution[0]].append(contribution[1]);
                     }
                     _free_processor = 1;
                 }
             }
+
+            // MAP CLEAN UP
+            for (int i = 1; i < _free_processor; ++i) {
+                MPI_Status status;
+                pair<K2, V2> contribution;
+
+                if(_reduce_container.count(contribution[0]) == 0) {
+                    _reduce_container[contribution[0]]();
+                }
+                _reduce_container[contribution[0]].append(contribution[1]);
+            }
+
+            _free_processor = 1;
+            task = 0;
+            int rsize = _reduce_container.size();
+            // REDUCE WORK
+            while(task < rsize) {
+
+                err = MPI_Send(REDUCER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
+                err = MPI_Send(&_reduce_container[task], 1, ,_free_processor, 0, MPI_COMM_WORLD);
+
+                task++;
+                _free_processor++;
+                if(_free_processor == size) {
+                    MPI_Status status;
+                    pair<K2, V2> contribution;
+
+                    for (int i = 1; i < size; ++i) {
+                        err = MPI_Recv(&contribution, 1, , i, 0, MPI_COMM_WORLD, &status);
+                        _result_container.append(contribution);
+                    }
+                    _free_processor = 1;
+                }
+            }
+
+            // REDUCE CLEAN UP
+            for (int i = 1; i < _free_processor; ++i) {
+                MPI_Status status;
+                pair<K2, V2> contribution;
+
+                err = MPI_Recv(&contribution. 1, , i, 0, MPI_COMM_WORLD, &status);
+                _result_container.append(contribution);
+            }
         }
+
+        virtual ~Master();
 };
 
 class Worker : public Handler {
@@ -124,4 +176,5 @@ class JobClient {
         }
 
 };
+
 #endif // Mapreduce_h
