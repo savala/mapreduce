@@ -4,206 +4,226 @@
 #include <vector>
 #include <map>
 #include <utility>
-#include "mpi.h"
+#include <boost/mpi.hpp>
 
 #define ROOT 0
 
 enum JobType { MAPPER = 0, REDUCER = 1, DONE = 2 };
 
 using namespace std;
+namespace mpi = boost::mpi;
 
-template<typename K1, typename V1, typename K2, typename V2>
+template<typename Ftype, typename Stype>
+class tuple {
+    private:
+        friend class boost::serialization::access;
+
+        template<class Archive>
+        void serialize(Archive &ar, const unsigned int version) {
+            ar &first;
+            ar &second;
+        }
+    
+    public:
+        Ftype first;
+        Stype second;
+        
+        tuple() { }
+        
+        tuple(Ftype f, Stype s) :
+            first(f), 
+            second(s)
+        { }
+
+        tuple(const tuple &that) :
+            first(that.first),
+            second(that.second)
+        { }
+
+        tuple& operator = (tuple that) {
+            swap(first, that.first);
+            swap(second, that.second);
+            return *this;
+        }
+};
+
+template<typename MK, typename MV, typename RK, typename RV>
 class Master {
     private:
-        vector<pair<K1, V1> > _map_container;
-        map<K2,  vector<V2> > _reduce_container;
-        vector<pair<K2, V2> > _result_container;
         int _free_processor;
+
+        void receive_map_results(int size) {
+            mpi::communicator world;
+
+            for (int i = 1; i < size; ++i) {
+                vector<tuple<RK, RV> > contribution;
+                
+                world.recv(i, 0, contribution);
+                for (int j = 0; j < contribution.size(); ++j) {
+                    _reduce_container[contribution[j].first].push_back(contribution[j].second);
+                }
+            }
+        }
+
+        void receive_reduce_results(int size) {
+            mpi::communicator world;
+
+            for (int i = 1; i < size; ++i) {
+                tuple<RK, RV> contribution;
+                
+                world.recv(i, 0, contribution);
+                _result_container.push_back(contribution);
+            }
+        }
+
+    protected:
+        vector<tuple<MK, MV> > _map_container;
+        vector<tuple<RK, RV> > _result_container;
+        map  <RK, vector<RV> > _reduce_container;
     
     public:
         Master() :
-            _map_container(vector<pair<K1, V1> >()),
-            _reduce_container(map<K2,  vector<V2> >()),
-            _result_container(vector<pair<K2, V2> >()),
-            _free_processor(1)
+            _map_container   (vector<tuple<MK, MV> >()),
+            _result_container(vector<tuple<RK, RV> >()),
+            _reduce_container(map  <RK, vector<RV> >()),
+            _free_processor  (1)
         { }
         
-        virtual void initialize();
+        virtual void initialize() = 0;
 
-        virtual void finalize() const;
+        virtual void finalize() const = 0;
 
         void run() {
-            MPI_Init(NULL, NULL);
-            int rank, size, err;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            mpi::communicator world;
 
+            int size = world.size();
             int task = 0;
             int msize = _map_container.size();
+
             // MAP WORK
             while(task < msize) {
+                printf("Sending map #%d to %d.\n", task, _free_processor);
 
-                err = MPI_Send(MAPPER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&_map_container[task], 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
+                world.send(_free_processor, 0, MAPPER);
+                world.send(_free_processor, 0, _map_container[task]);
                 
                 task++;
                 _free_processor++;
                 if(_free_processor == size) {
-                    MPI_Status status;
-                    vector<pair<K2, V2> > contribution;
-
-                    for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-
-                        for (int j = 0; j < contribution.size(); ++j) {
-                            if(_reduce_container.count(contribution[j][0]) == 0) {
-                                _reduce_container[contribution[j][0]](vector<V2>());
-                            }
-                            _reduce_container[contribution[j][0]].append(contribution[j][1]);
-                        }
-                    }
+                    receive_map_results(size);                    
+                    printf("Received results.\n");
                     _free_processor = 1;
                 }
             }
 
             // MAP CLEAN UP
-            for (int i = 1; i < _free_processor; ++i) {
-                MPI_Status status;
-                vector<pair<K2, V2> > contribution;
+            receive_map_results(_free_processor);
 
-                for (int j = 0; j < contribution.size(); ++j) {
-                    if(_reduce_container.count(contribution[j][0]) == 0) {
-                        _reduce_container[contribution[j][0]](vector<V2>());
-                    }
-                    _reduce_container[contribution[j][0]].append(contribution[j][1]);
-                }
-            }
-
+            map<char, vector<int> >::iterator it = _reduce_container.begin();
             _free_processor = 1;
-            task = 0;
-            int rsize = _reduce_container.size();
+            
             // REDUCE WORK
-            while(task < rsize) {
-                pair<K2, V2> work;
-                work[0](_reduce_container[task][0]);
-                work[1](_reduce_container[task][1]);
+            while(it != _reduce_container.end()) {
+                printf("Sending reduce #%d to %d.\n", task, _free_processor);
 
-                err = MPI_Send(REDUCER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&work, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
+                tuple<RK, vector<RV> > work;
+                work.first = it->first;
+                work.second = it->second;
 
-                task++;
+                world.send(_free_processor, 0, REDUCER);
+                world.send(_free_processor, 0, work);
+
                 _free_processor++;
+                it++;
                 if(_free_processor == size) {
-                    MPI_Status status;
-                    pair<K2, V2> contribution;
-
-                    for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-                        _result_container.append(contribution);
-                    }
+                    receive_reduce_results(size);
                     _free_processor = 1;
                 }
             }
 
             // REDUCE CLEAN UP
-            for (int i = 1; i < _free_processor; ++i) {
-                MPI_Status status;
-                pair<K2, V2> contribution;
-
-                err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-                _result_container.append(contribution);
-            }
+            receive_reduce_results(_free_processor);
         }
 
-        virtual ~Master();
+        virtual ~Master() { }
 };
 
-template<typename K1, typename V1, typename K2, typename V2>
+template<typename MK, typename MV, typename RK, typename RV>
 class Mapper {
-    private:       
-
     public:    
-        Mapper();
+        Mapper() { }
 
-        virtual vector<pair<K2, V2> > map(vector<pair<K1, V1> > pairs);
+        virtual vector<tuple<RK, RV> > map(vector<tuple<MK, MV> > tuples) = 0;
 
         void work() {
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            mpi::communicator world;
 
-            int err;
-            MPI_Status status;
-            vector<pair<K1, V1> > pairs;
-            vector<pair<K2, V2> > results;
-            err = MPI_Recv(&pairs, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
-            results = map(pairs);
-            err = MPI_Send(&results, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+            vector<tuple<MK, MV> > tuples;
+            vector<tuple<RK, RV> > results;
+            world.recv(ROOT, 0, tuples);
+            results = map(tuples);
+            world.send(ROOT, 0, results);
+            printf("%d is done with map task.\n", world.rank());
         }
         
-        virtual ~Mapper();
+        virtual ~Mapper() { }
 };
 
-template<typename K2, typename V2>
+template<typename RK, typename RV>
 class Reducer {
-    private:
-
     public:      
-        Reducer();
+        Reducer() { }
 
-        virtual pair<K2, V2> reduce(K2 key, vector<V2> values);
+        virtual tuple<RK, RV> reduce(RK key, vector<RV> values) = 0;
 
         void work() {
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            mpi::communicator world;
 
-            int err;
-            MPI_Status status;
-            pair<K2, vector<V2> > pairs;
-            pair<K2, V2> result;
-            err = MPI_Recv(&pairs, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
-            result = reduce(pairs);
-            err = MPI_Send(&result, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+            tuple<RK, vector<RV> > tuples;
+            tuple<RK, RV> result;
+            world.recv(ROOT, 0, tuples);
+            result = reduce(tuples.first, tuples.second);
+            world.send(ROOT, 0, result);
+            printf("%d is done with map reduce task.\n", world.rank());
         }
 
-        virtual ~Reducer();
+        virtual ~Reducer() { }
 };
 
-template<typename K1, typename V1, typename K2, typename V2>
+template<typename MK, typename MV, typename RK, typename RV>
 class JobClient {
     public:
-        
-        void run(Master<K1, V1, K2, V2> m, Mapper<K1, V1, K2, V2> t, Reducer<K2, V2> r) {
-            MPI_Init(NULL, NULL);
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+        void run(Master<MK, MV, RK, RV> master, Mapper<MK, MV, RK, RV> mapper, Reducer<RK, RV> reducer) {
+            mpi::environment env;
+            mpi::communicator world;
+            int rank = world.rank();
+            int size = world.size();
             
             if (rank == ROOT) {
-                m.run();
+                printf("Master %d with %d workers.\n", rank, size);
+                master.run();
             } else {
-                wait_for_work(t, r);
+                wait_for_work(mapper, reducer);
             }
         }
 
-        void wait_for_work(Mapper<K1, V1, K2, V2> m, Reducer<K2, V2> r) {
+        void wait_for_work(Mapper<MK, MV, RK, RV> mapper, Reducer<RK, RV> reducer) {
+            mpi::communicator world;
+
             bool done = false;
             while(!done) {
-                int err;
-                MPI_Status s;
                 JobType w;
 
-                err = MPI_Recv(&w, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &s);
+                world.recv(ROOT, 0, w);
+                printf("%d received a job of type %d.\n", world.rank(), w);
                 switch(w) {
-                    case MAPPER     : m.work();    break;
-                    case REDUCER    : r.work();    break;
-                    case DONE       : done = true; break;
+                    case MAPPER     : mapper.work();  break;
+                    case REDUCER    : reducer.work(); break;
+                    case DONE       : done = true;    break;
                     default         : cout << "This should not happen." << endl;
                 }
             }
         }
-
 };
 
 #endif // Mapreduce_h
