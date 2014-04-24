@@ -20,5 +20,6 @@
 *.out
 *.app
 
+*.dSYM
 *.temp
 .DS_Store
