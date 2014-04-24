@@ -14,42 +14,42 @@ using namespace std;
 namespace mpi = boost::mpi;
 
 template<typename Ftype, typename Stype>
-class spair : public pair<Ftype, Stype> {
+class tuple {
     private:
         friend class boost::serialization::access;
 
         template<class Archive>
         void serialize(Archive &ar, const unsigned int version) {
-            ar &_first;
-            ar &_second;
+            ar &first;
+            ar &second;
         }
-
-        Ftype _first;
-        Stype _second;
     
     public:
-        spair() { }
+        Ftype first;
+        Stype second;
         
-        spair(Ftype f, Stype s) :
-            _first(f), 
-            _second(s),
-            pair<Ftype, Stype>(make_pair<Ftype, Stype>(f, s))
+        tuple() { }
+        
+        tuple(Ftype f, Stype s) :
+            first(f), 
+            second(s)
         { }
 };
 
-class Master {    
+template<typename MK, typename MV, typename RK, typename RV>
+class Master {
     protected:
-        vector<spair<char, int> > _map_container;
-        vector<spair<char, int> > _result_container;
-        map< char, vector<int> > _reduce_container;
+        vector<tuple<MK, MV> > _map_container;
+        vector<tuple<RK, RV> > _result_container;
+        map  <RK, vector<RV> > _reduce_container;
         int _free_processor;
     
     public:
         Master() :
-            _map_container(vector<spair<char, int> >()),
-            _reduce_container(map<char, vector<int> >()),
-            _result_container(vector<spair<char, int> >()),
-            _free_processor(1)
+            _map_container   (vector<tuple<MK, MV> >()),
+            _result_container(vector<tuple<RK, RV> >()),
+            _reduce_container(map  <RK, vector<RV> >()),
+            _free_processor  (1)
         { }
         
         virtual void initialize() = 0;
@@ -62,7 +62,7 @@ class Master {
             int size = world.size();
             int task = 0;
             int msize = _map_container.size();
-            
+
             // MAP WORK
             while(task < msize) {
 
@@ -72,14 +72,14 @@ class Master {
                 task++;
                 _free_processor++;
                 if(_free_processor == size) {
-                    vector<spair<char, int> > contribution;
+                    vector<tuple<RK, RV> > contribution;
 
                     for (int i = 1; i < size; ++i) {
                         world.recv(i, 0, contribution);
 
                         for (int j = 0; j < contribution.size(); ++j) {
                             if(_reduce_container.count(contribution[j].first) == 0) {
-                                _reduce_container[contribution[j].first] = vector<int>();
+                                _reduce_container[contribution[j].first] = vector<RV>();
                             }
                             _reduce_container[contribution[j].first].push_back(contribution[j].second);
                         }
@@ -90,12 +90,12 @@ class Master {
 
             // MAP CLEAN UP
             for (int i = 1; i < _free_processor; ++i) {
-                vector<spair<char, int> > contribution;
+                vector<tuple<RK, RV> > contribution;
 
                 world.recv(i, 0, contribution);
                 for (int j = 0; j < contribution.size(); ++j) {
                     if(_reduce_container.count(contribution[j].first) == 0) {
-                        _reduce_container[contribution[j].first] = vector<int>();
+                        _reduce_container[contribution[j].first] = vector<RV>();
                     }
                     _reduce_container[contribution[j].first].push_back(contribution[j].second);
                 }
@@ -104,10 +104,9 @@ class Master {
             typedef map<char, vector<int> >::iterator it_type;
             it_type iterator = _reduce_container.begin();
             _free_processor = 1;
-            task = 0;
             // REDUCE WORK
             while(iterator != _reduce_container.end()) {
-                spair<char, vector<int> > work;
+                tuple<RK, vector<RV> > work;
                 work.first = iterator->first;
                 work.second = iterator->second;
 
@@ -117,7 +116,7 @@ class Master {
                 _free_processor++;
                 iterator++;
                 if(_free_processor == size) {
-                    spair<char, int> contribution;
+                    tuple<RK, RV> contribution;
 
                     for (int i = 1; i < size; ++i) {
                         world.recv(i, 0, contribution);
@@ -129,7 +128,7 @@ class Master {
 
             // REDUCE CLEAN UP
             for (int i = 1; i < _free_processor; ++i) {
-                spair<char, int> contribution;
+                tuple<RK, RV> contribution;
 
                 world.recv(i, 0, contribution);
                 _result_container.push_back(contribution);
@@ -139,49 +138,53 @@ class Master {
         virtual ~Master() { }
 };
 
+template<typename MK, typename MV, typename RK, typename RV>
 class Mapper {
     public:    
         Mapper() { }
 
-        virtual vector<spair<char, int> > map(vector<spair<char, int> > spairs) = 0;
+        virtual vector<tuple<RK, RV> > map(vector<tuple<MK, MV> > tuples) = 0;
 
         void work() {
             mpi::communicator world;
             int err;
 
-            vector<spair<char, int> > spairs;
-            vector<spair<char, int> > results;
-            world.recv(ROOT, 0, spairs);
-            results = map(spairs);
+            vector<tuple<MK, MV> > tuples;
+            vector<tuple<RK, RV> > results;
+            world.recv(ROOT, 0, tuples);
+            results = map(tuples);
             world.send(ROOT, 0, results);
         }
         
         virtual ~Mapper() { }
 };
 
+template<typename RK, typename RV>
 class Reducer {
-    public:        
+    public:      
         Reducer() { }
 
-        virtual spair<char, int> reduce(char key, vector<int> values) = 0;
+        virtual tuple<RK, RV> reduce(RK key, vector<RV> values) = 0;
 
         void work() {
             mpi::communicator world;
             int err;
 
-            spair<char, vector<int> > spairs;
-            spair<char, int> result;
-            world.recv(ROOT, 0, spairs);
-            result = reduce(spairs.first, spairs.second);
+            tuple<RK, vector<RV> > tuples;
+            tuple<RK, RV> result;
+            world.recv(ROOT, 0, tuples);
+            result = reduce(tuples.first, tuples.second);
             world.send(ROOT, 0, result);
         }
 
         virtual ~Reducer() { }
 };
 
+template<typename MK, typename MV, typename RK, typename RV>
 class JobClient {
-    public:     
-        void run(Master master, Mapper mapper, Reducer reducer) {
+    public:
+        
+        void run(Master<MK, MV, RK, RV> master, Mapper<MK, MV, RK, RV> mapper, Reducer<RK, RV> reducer) {
             mpi::environment env;
             mpi::communicator world;
             int rank = world.rank();
@@ -194,7 +197,7 @@ class JobClient {
             }
         }
 
-        void wait_for_work(Mapper mapper, Reducer reducer) {
+        void wait_for_work(Mapper<MK, MV, RK, RV> mapper, Reducer<RK, RV> reducer) {
             mpi::communicator world;
 
             bool done = false;
