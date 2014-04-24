@@ -23,3 +23,8 @@
 *.dSYM
 *.temp
 .DS_Store
+
+*.aux
+*.log
+*.gz
+*.toc
