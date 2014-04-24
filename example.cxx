@@ -7,17 +7,19 @@
 class CharCountMaster : public Master<char, int, char, int> {
     public:
 
-    void initialize() {
+    virtual void initialize() {
         _map_container.push_back(tuple<char, int>('a', 1));
         _map_container.push_back(tuple<char, int>('a', 1));
         _map_container.push_back(tuple<char, int>('b', 1));
         _map_container.push_back(tuple<char, int>('c', 1));
     }
 
-    void finalize() const {
+    virtual void finalize() const {
+        printf("Char counts: \n");
         for (int i = 0; i < _result_container.size(); ++i) {
             printf("%c:%d ", _result_container[i].first, _result_container[i].second);
         }
+        printf("\n");
     }
 };
 
@@ -41,11 +43,12 @@ class CharCountReducer : public Reducer<char, int> {
 
 int main() {
     JobClient<char, int, char, int> jc;
-    CharCountMaster master;
-    CharCountMapper mapper;
-    CharCountReducer reducer;
+    Master<char, int, char, int>* master = new CharCountMaster();
+    Mapper<char, int, char, int>* mapper = new CharCountMapper();
+    Reducer<char, int>* reducer = new CharCountReducer();
 
-    master.initialize();
     jc.run(master, mapper, reducer);
-    master.finalize();
+    delete master;
+    delete mapper;
+    delete reducer;
 }
