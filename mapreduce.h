@@ -34,15 +34,52 @@ class tuple {
             first(f), 
             second(s)
         { }
+
+        tuple(const tuple &that) :
+            first(that.first),
+            second(that.second)
+        { }
+
+        tuple& operator = (tuple that) {
+            swap(first, that.first);
+            swap(second, that.second);
+            return *this;
+        }
 };
 
 template<typename MK, typename MV, typename RK, typename RV>
 class Master {
+    private:
+        int _free_processor;
+
+        void receive_map_results(int size) {
+            mpi::communicator world;
+
+            for (int i = 1; i < size; ++i) {
+                vector<tuple<RK, RV> > contribution;
+                
+                world.recv(i, 0, contribution);
+                for (int j = 0; j < contribution.size(); ++j) {
+                    _reduce_container[contribution[j].first].push_back(contribution[j].second);
+                }
+            }
+        }
+
+        void receive_reduce_results(int size) {
+            mpi::communicator world;
+
+            for (int i = 1; i < size; ++i) {
+                tuple<RK, RV> contribution;
+                
+                world.recv(i, 0, contribution);
+                _result_container.push_back(contribution);
+            }
+        }
+
     protected:
         vector<tuple<MK, MV> > _map_container;
         vector<tuple<RK, RV> > _result_container;
         map  <RK, vector<RV> > _reduce_container;
-        int _free_processor;
     
     public:
         Master() :
@@ -65,6 +102,7 @@ class Master {
 
             // MAP WORK
             while(task < msize) {
+                printf("Sending map #%d to %d.\n", task, _free_processor);
 
                 world.send(_free_processor, 0, MAPPER);
                 world.send(_free_processor, 0, _map_container[task]);
@@ -72,67 +110,39 @@ class Master {
                 task++;
                 _free_processor++;
                 if(_free_processor == size) {
-                    vector<tuple<RK, RV> > contribution;
-
-                    for (int i = 1; i < size; ++i) {
-                        world.recv(i, 0, contribution);
-
-                        for (int j = 0; j < contribution.size(); ++j) {
-                            if(_reduce_container.count(contribution[j].first) == 0) {
-                                _reduce_container[contribution[j].first] = vector<RV>();
-                            }
-                            _reduce_container[contribution[j].first].push_back(contribution[j].second);
-                        }
-                    }
+                    receive_map_results(size);                    
+                    printf("Received results.\n");
                     _free_processor = 1;
                 }
             }
 
             // MAP CLEAN UP
-            for (int i = 1; i < _free_processor; ++i) {
-                vector<tuple<RK, RV> > contribution;
+            receive_map_results(_free_processor);
 
-                world.recv(i, 0, contribution);
-                for (int j = 0; j < contribution.size(); ++j) {
-                    if(_reduce_container.count(contribution[j].first) == 0) {
-                        _reduce_container[contribution[j].first] = vector<RV>();
-                    }
-                    _reduce_container[contribution[j].first].push_back(contribution[j].second);
-                }
-            }
-
-            typedef map<char, vector<int> >::iterator it_type;
-            it_type iterator = _reduce_container.begin();
+            map<char, vector<int> >::iterator it = _reduce_container.begin();
             _free_processor = 1;
+            
             // REDUCE WORK
-            while(iterator != _reduce_container.end()) {
+            while(it != _reduce_container.end()) {
+                printf("Sending reduce #%d to %d.\n", task, _free_processor);
+
                 tuple<RK, vector<RV> > work;
-                work.first = iterator->first;
-                work.second = iterator->second;
+                work.first = it->first;
+                work.second = it->second;
 
                 world.send(_free_processor, 0, REDUCER);
                 world.send(_free_processor, 0, work);
 
                 _free_processor++;
-                iterator++;
+                it++;
                 if(_free_processor == size) {
-                    tuple<RK, RV> contribution;
-
-                    for (int i = 1; i < size; ++i) {
-                        world.recv(i, 0, contribution);
-                        _result_container.push_back(contribution);
-                    }
+                    receive_reduce_results(size);
                     _free_processor = 1;
                 }
             }
 
             // REDUCE CLEAN UP
-            for (int i = 1; i < _free_processor; ++i) {
-                tuple<RK, RV> contribution;
-
-                world.recv(i, 0, contribution);
-                _result_container.push_back(contribution);
-            }
+            receive_reduce_results(_free_processor);
         }
 
         virtual ~Master() { }
@@ -147,13 +157,13 @@ class Mapper {
 
         void work() {
             mpi::communicator world;
-            int err;
 
             vector<tuple<MK, MV> > tuples;
             vector<tuple<RK, RV> > results;
             world.recv(ROOT, 0, tuples);
             results = map(tuples);
             world.send(ROOT, 0, results);
+            printf("%d is done with map task.\n", world.rank());
         }
         
         virtual ~Mapper() { }
@@ -168,13 +178,13 @@ class Reducer {
 
         void work() {
             mpi::communicator world;
-            int err;
 
             tuple<RK, vector<RV> > tuples;
             tuple<RK, RV> result;
             world.recv(ROOT, 0, tuples);
             result = reduce(tuples.first, tuples.second);
             world.send(ROOT, 0, result);
+            printf("%d is done with map reduce task.\n", world.rank());
         }
 
         virtual ~Reducer() { }
@@ -183,7 +193,6 @@ class Reducer {
 template<typename MK, typename MV, typename RK, typename RV>
 class JobClient {
     public:
-        
         void run(Master<MK, MV, RK, RV> master, Mapper<MK, MV, RK, RV> mapper, Reducer<RK, RV> reducer) {
             mpi::environment env;
             mpi::communicator world;
@@ -191,6 +200,7 @@ class JobClient {
             int size = world.size();
             
             if (rank == ROOT) {
+                printf("Master %d with %d workers.\n", rank, size);
                 master.run();
             } else {
                 wait_for_work(mapper, reducer);
@@ -202,11 +212,10 @@ class JobClient {
 
             bool done = false;
             while(!done) {
-                int err;
-                MPI_Status s;
                 JobType w;
 
                 world.recv(ROOT, 0, w);
+                printf("%d received a job of type %d.\n", world.rank(), w);
                 switch(w) {
                     case MAPPER     : mapper.work();  break;
                     case REDUCER    : reducer.work(); break;
