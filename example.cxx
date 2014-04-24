@@ -4,14 +4,14 @@
 #include <map>
 #include <utility>
 
-class CharCountMaster : public Master {
+class CharCountMaster : public Master<char, int, char, int> {
     public:
 
     void initialize() {
-        _map_container[0] = spair<char, int>('a', 1);
-        _map_container[1] = spair<char, int>('a', 1);
-        _map_container[2] = spair<char, int>('b', 1);
-        _map_container[3] = spair<char, int>('c', 1);
+        _map_container[0] = tuple<char, int>('a', 1);
+        _map_container[1] = tuple<char, int>('a', 1);
+        _map_container[2] = tuple<char, int>('b', 1);
+        _map_container[3] = tuple<char, int>('c', 1);
     }
 
     void finalize() const {
@@ -21,26 +21,26 @@ class CharCountMaster : public Master {
     }
 };
 
-class CharCountMapper : public Mapper {
+class CharCountMapper : public Mapper<char, int, char, int> {
 
-    vector<spair<char, int> > map(vector<spair<char, int> > spairs) {
-        return spairs;
+    vector<tuple<char, int> > map(vector<tuple<char, int> > tuples) {
+        return tuples;
     }
 };
 
-class CharCountReducer : public Reducer {
+class CharCountReducer : public Reducer<char, int> {
 
-    spair<char, int> reduce(char key, vector<int> values) {
+    tuple<char, int> reduce(char key, vector<int> values) {
         int sum = 0;
         for (int i = 0; i < values.size(); ++i) {
             sum += values[i];
         }
-        return spair<char, int>(key, sum);
+        return tuple<char, int>(key, sum);
     }
 };
 
 int main() {
-    JobClient jc;
+    JobClient<char, int, char, int> jc;
     CharCountMaster master;
     CharCountMapper mapper;
     CharCountReducer reducer;
