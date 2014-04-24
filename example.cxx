@@ -8,10 +8,10 @@ class CharCountMaster : public Master<char, int, char, int> {
     public:
 
     void initialize() {
-        _map_container[0] = tuple<char, int>('a', 1);
-        _map_container[1] = tuple<char, int>('a', 1);
-        _map_container[2] = tuple<char, int>('b', 1);
-        _map_container[3] = tuple<char, int>('c', 1);
+        _map_container.push_back(tuple<char, int>('a', 1));
+        _map_container.push_back(tuple<char, int>('a', 1));
+        _map_container.push_back(tuple<char, int>('b', 1));
+        _map_container.push_back(tuple<char, int>('c', 1));
     }
 
     void finalize() const {
