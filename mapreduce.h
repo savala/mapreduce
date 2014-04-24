@@ -4,62 +4,84 @@
 #include <vector>
 #include <map>
 #include <utility>
-#include "mpi.h"
+#include <boost/mpi.hpp>
 
 #define ROOT 0
 
 enum JobType { MAPPER = 0, REDUCER = 1, DONE = 2 };
 
 using namespace std;
+namespace mpi = boost::mpi;
 
-template<typename K1, typename V1, typename K2, typename V2>
-class Master {
+template<typename Ftype, typename Stype>
+class spair : public pair<Ftype, Stype> {
     private:
-        vector<pair<K1, V1> > _map_container;
-        map<K2,  vector<V2> > _reduce_container;
-        vector<pair<K2, V2> > _result_container;
+        friend class boost::serialization::access;
+
+        template<class Archive>
+        void serialize(Archive &ar, const unsigned int version) {
+            ar &_first;
+            ar &_second;
+        }
+
+        Ftype _first;
+        Stype _second;
+    
+    public:
+        spair() { }
+        
+        spair(Ftype f, Stype s) :
+            _first(f), 
+            _second(s),
+            pair<Ftype, Stype>(make_pair<Ftype, Stype>(f, s))
+        { }
+};
+
+class Master {    
+    protected:
+        vector<spair<char, int> > _map_container;
+        vector<spair<char, int> > _result_container;
+        map< char, vector<int> > _reduce_container;
         int _free_processor;
     
     public:
         Master() :
-            _map_container(vector<pair<K1, V1> >()),
-            _reduce_container(map<K2,  vector<V2> >()),
-            _result_container(vector<pair<K2, V2> >()),
+            _map_container(vector<spair<char, int> >()),
+            _reduce_container(map<char, vector<int> >()),
+            _result_container(vector<spair<char, int> >()),
             _free_processor(1)
         { }
         
-        virtual void initialize();
+        virtual void initialize() = 0;
 
-        virtual void finalize() const;
+        virtual void finalize() const = 0;
 
         void run() {
-            MPI_Init(NULL, NULL);
-            int rank, size, err;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            mpi::communicator world;
 
+            int size = world.size();
             int task = 0;
             int msize = _map_container.size();
+            
             // MAP WORK
             while(task < msize) {
 
-                err = MPI_Send(MAPPER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&_map_container[task], 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
+                world.send(_free_processor, 0, MAPPER);
+                world.send(_free_processor, 0, _map_container[task]);
                 
                 task++;
                 _free_processor++;
                 if(_free_processor == size) {
-                    MPI_Status status;
-                    vector<pair<K2, V2> > contribution;
+                    vector<spair<char, int> > contribution;
 
                     for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
+                        world.recv(i, 0, contribution);
 
                         for (int j = 0; j < contribution.size(); ++j) {
-                            if(_reduce_container.count(contribution[j][0]) == 0) {
-                                _reduce_container[contribution[j][0]](vector<V2>());
+                            if(_reduce_container.count(contribution[j].first) == 0) {
+                                _reduce_container[contribution[j].first] = vector<int>();
                             }
-                            _reduce_container[contribution[j][0]].append(contribution[j][1]);
+                            _reduce_container[contribution[j].first].push_back(contribution[j].second);
                         }
                     }
                     _free_processor = 1;
@@ -68,38 +90,38 @@ class Master {
 
             // MAP CLEAN UP
             for (int i = 1; i < _free_processor; ++i) {
-                MPI_Status status;
-                vector<pair<K2, V2> > contribution;
+                vector<spair<char, int> > contribution;
 
+                world.recv(i, 0, contribution);
                 for (int j = 0; j < contribution.size(); ++j) {
-                    if(_reduce_container.count(contribution[j][0]) == 0) {
-                        _reduce_container[contribution[j][0]](vector<V2>());
+                    if(_reduce_container.count(contribution[j].first) == 0) {
+                        _reduce_container[contribution[j].first] = vector<int>();
                     }
-                    _reduce_container[contribution[j][0]].append(contribution[j][1]);
+                    _reduce_container[contribution[j].first].push_back(contribution[j].second);
                 }
             }
 
+            typedef map<char, vector<int> >::iterator it_type;
+            it_type iterator = _reduce_container.begin();
             _free_processor = 1;
             task = 0;
-            int rsize = _reduce_container.size();
             // REDUCE WORK
-            while(task < rsize) {
-                pair<K2, V2> work;
-                work[0](_reduce_container[task][0]);
-                work[1](_reduce_container[task][1]);
+            while(iterator != _reduce_container.end()) {
+                spair<char, vector<int> > work;
+                work.first = iterator->first;
+                work.second = iterator->second;
 
-                err = MPI_Send(REDUCER, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
-                err = MPI_Send(&work, 1, MPI_INT, _free_processor, 0, MPI_COMM_WORLD);
+                world.send(_free_processor, 0, REDUCER);
+                world.send(_free_processor, 0, work);
 
-                task++;
                 _free_processor++;
+                iterator++;
                 if(_free_processor == size) {
-                    MPI_Status status;
-                    pair<K2, V2> contribution;
+                    spair<char, int> contribution;
 
                     for (int i = 1; i < size; ++i) {
-                        err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-                        _result_container.append(contribution);
+                        world.recv(i, 0, contribution);
+                        _result_container.push_back(contribution);
                     }
                     _free_processor = 1;
                 }
@@ -107,103 +129,89 @@ class Master {
 
             // REDUCE CLEAN UP
             for (int i = 1; i < _free_processor; ++i) {
-                MPI_Status status;
-                pair<K2, V2> contribution;
+                spair<char, int> contribution;
 
-                err = MPI_Recv(&contribution, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-                _result_container.append(contribution);
+                world.recv(i, 0, contribution);
+                _result_container.push_back(contribution);
             }
         }
 
-        virtual ~Master();
+        virtual ~Master() { }
 };
 
-template<typename K1, typename V1, typename K2, typename V2>
 class Mapper {
-    private:       
-
     public:    
-        Mapper();
+        Mapper() { }
 
-        virtual vector<pair<K2, V2> > map(vector<pair<K1, V1> > pairs);
+        virtual vector<spair<char, int> > map(vector<spair<char, int> > spairs) = 0;
 
         void work() {
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
-
+            mpi::communicator world;
             int err;
-            MPI_Status status;
-            vector<pair<K1, V1> > pairs;
-            vector<pair<K2, V2> > results;
-            err = MPI_Recv(&pairs, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
-            results = map(pairs);
-            err = MPI_Send(&results, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+
+            vector<spair<char, int> > spairs;
+            vector<spair<char, int> > results;
+            world.recv(ROOT, 0, spairs);
+            results = map(spairs);
+            world.send(ROOT, 0, results);
         }
         
-        virtual ~Mapper();
+        virtual ~Mapper() { }
 };
 
-template<typename K2, typename V2>
 class Reducer {
-    private:
+    public:        
+        Reducer() { }
 
-    public:      
-        Reducer();
-
-        virtual pair<K2, V2> reduce(K2 key, vector<V2> values);
+        virtual spair<char, int> reduce(char key, vector<int> values) = 0;
 
         void work() {
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
-
+            mpi::communicator world;
             int err;
-            MPI_Status status;
-            pair<K2, vector<V2> > pairs;
-            pair<K2, V2> result;
-            err = MPI_Recv(&pairs, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &status);
-            result = reduce(pairs);
-            err = MPI_Send(&result, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD);
+
+            spair<char, vector<int> > spairs;
+            spair<char, int> result;
+            world.recv(ROOT, 0, spairs);
+            result = reduce(spairs.first, spairs.second);
+            world.send(ROOT, 0, result);
         }
 
-        virtual ~Reducer();
+        virtual ~Reducer() { }
 };
 
-template<typename K1, typename V1, typename K2, typename V2>
 class JobClient {
-    public:
-        
-        void run(Master<K1, V1, K2, V2> m, Mapper<K1, V1, K2, V2> t, Reducer<K2, V2> r) {
-            MPI_Init(NULL, NULL);
-            int rank, size;
-            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-            MPI_Comm_size(MPI_COMM_WORLD, &size);
+    public:     
+        void run(Master master, Mapper mapper, Reducer reducer) {
+            mpi::environment env;
+            mpi::communicator world;
+            int rank = world.rank();
+            int size = world.size();
             
             if (rank == ROOT) {
-                m.run();
+                master.run();
             } else {
-                wait_for_work(t, r);
+                wait_for_work(mapper, reducer);
             }
         }
 
-        void wait_for_work(Mapper<K1, V1, K2, V2> m, Reducer<K2, V2> r) {
+        void wait_for_work(Mapper mapper, Reducer reducer) {
+            mpi::communicator world;
+
             bool done = false;
             while(!done) {
                 int err;
                 MPI_Status s;
                 JobType w;
 
-                err = MPI_Recv(&w, 1, MPI_INT, ROOT, 0, MPI_COMM_WORLD, &s);
+                world.recv(ROOT, 0, w);
                 switch(w) {
-                    case MAPPER     : m.work();    break;
-                    case REDUCER    : r.work();    break;
-                    case DONE       : done = true; break;
+                    case MAPPER     : mapper.work();  break;
+                    case REDUCER    : reducer.work(); break;
+                    case DONE       : done = true;    break;
                     default         : cout << "This should not happen." << endl;
                 }
             }
         }
-
 };
 
 #endif // Mapreduce_h
