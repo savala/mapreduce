@@ -20,4 +20,5 @@
 *.out
 *.app
 
+*.temp
 .DS_Store
