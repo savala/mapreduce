@@ -51,6 +51,7 @@ template<typename MK, typename MV, typename RK, typename RV>
 class Master {
     private:
         int _free_processor;
+        typedef typename map<RK, vector<RV> >::iterator it_type;
 
         void receive_map_results(int size) {
             mpi::communicator world;
@@ -119,7 +120,7 @@ class Master {
             // MAP CLEAN UP
             receive_map_results(_free_processor);
 
-            map<char, vector<int> >::iterator it = _reduce_container.begin();
+            it_type it = _reduce_container.begin();
             _free_processor = 1;
             
             // REDUCE WORK
