@@ -4,17 +4,27 @@
 #include <map>
 #include <utility>
 
-class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<int> > {
+typedef tuple<int, int> VL;
+
+typedef int             MK;
+typedef vector<VL>      MV;
+typedef int             RK;
+typedef vector<int>     RV;
+
+typedef tuple<MK, MV>   MPAIR;
+typedef tuple<RK, RV>   RPAIR;
+
+class MatrixMaster : public Master<MK, MV, RK, RV> {
 
     virtual void initialize() {        
-        vector<tuple<int, vector<tuple<int, int> > > > list;
-        tuple<int, vector<tuple<int, int> > > listTuple;
+        vector<MPAIR> list;
+        MPAIR listTuple;
         
         listTuple.first = 1;
-        vector<tuple<int, int> > tupleValues;
-        tupleValues.push_back(tuple<int, int>(7, 5));
-        tupleValues.push_back(tuple<int, int>(4, 1));
-        tupleValues.push_back(tuple<int, int>(2, 7));
+        MV tupleValues;
+        tupleValues.push_back(VL(7, 5));
+        tupleValues.push_back(VL(4, 1));
+        tupleValues.push_back(VL(2, 7));
         listTuple.second = tupleValues;
 
         list.push_back(listTuple);
@@ -24,14 +34,14 @@ class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<in
 
         listTuple.first = 2;
         tupleValues.clear();
-        tupleValues.push_back(tuple<int, int>(6, 5));
+        tupleValues.push_back(VL(6, 5));
         listTuple.second = tupleValues;
 
         list.push_back(listTuple);
 
         listTuple.first = 2;
         tupleValues.clear();
-        tupleValues.push_back(tuple<int, int>(3, 1));
+        tupleValues.push_back(VL(3, 1));
         listTuple.second = tupleValues;
 
         list.push_back(listTuple);
@@ -41,7 +51,7 @@ class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<in
 
         listTuple.first = 2;
         tupleValues.clear();
-        tupleValues.push_back(tuple<int, int>(9, 7));
+        tupleValues.push_back(VL(9, 7));
         listTuple.second = tupleValues;
 
         list.push_back(listTuple);
@@ -50,7 +60,7 @@ class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<in
 
     virtual void finalize() const {
         printf("Result: \n");
-        // vector<tuple<RK, RV> > _result_container;
+        
         for (int i = 0; i < _result_container.size(); ++i) {
             printf("%d:%d ", _result_container[i].first, _result_container[i].second[0]);
         }
@@ -58,16 +68,15 @@ class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<in
     }
 };
 
-class MatrixMapper : public Mapper<int, vector<tuple<int, int> >, int, vector<int> > {
+class MatrixMapper : public Mapper<MK, MV, RK, RV> {
 
-    // vector<tuple<RK, RV> > map(vector<tuple<MK, MV> > tuples)
-    vector<tuple<int, vector<int> > > map(vector<tuple<int, vector<tuple<int, int> > > > tuples) {
-        vector<tuple<int, vector<int> > > result;
+    virtual vector<RPAIR > map(vector<MPAIR> tuples) {
+        vector<RPAIR > result;
         for (int i = 0; i < tuples.size(); ++i) {
-            int key = tuples[i].first;
-            vector<tuple<int, int> > values = tuples[i].second;
+            RK key = tuples[i].first;
+            MV values = tuples[i].second;
 
-            vector<int> prods;
+            RV prods;
             for (int j = 0; j < values.size(); ++j) {
                 int r = values[j].first;
                 int c = values[j].second;
@@ -75,37 +84,36 @@ class MatrixMapper : public Mapper<int, vector<tuple<int, int> >, int, vector<in
                 prods.push_back(r * c);
             }
 
-            result.push_back(tuple<int, vector<int> >(key, prods));
+            result.push_back(RPAIR(key, prods));
         }
 
         return result;
     }
 };
 
-class MatrixReducer : public Reducer<int, vector<int> > {
+class MatrixReducer : public Reducer<RK, RV> {
 
-    // tuple<RK, RV> reduce(RK key, vector<RV> values)
-    tuple<int, vector<int> > reduce(int key, vector<vector<int> > values) {
+    virtual RPAIR reduce(RK key, vector<RV> values) {
         int sum = 0;
         for (int i = 0; i < values.size(); ++i) {
-            vector<int> list = values[i];
+            RV list = values[i];
 
             for (int j = 0; j < list.size(); ++j) {
                 sum += list[j];                
             }
         }
 
-        vector<int> result;
+        RV result;
         result.push_back(sum);
-        return tuple<int, vector<int> >(key, result);
+        return RPAIR(key, result);
     }
 };
 
 int main() {
-    JobClient<int, vector<tuple<int, int> >, int, vector<int> > jc;
-    Master<int, vector<tuple<int, int> >, int, vector<int> >* master = new MatrixMaster();
-    Mapper<int, vector<tuple<int, int> >, int, vector<int> >* mapper = new MatrixMapper();
-    Reducer<int, vector<int> >* reducer = new MatrixReducer();
+    JobClient<MK, MV, RK, RV>   jc;
+    Master   <MK, MV, RK, RV>*  master  = new MatrixMaster();
+    Mapper   <MK, MV, RK, RV>*  mapper  = new MatrixMapper();
+    Reducer  <RK, RV>*          reducer = new MatrixReducer();
 
     jc.run(master, mapper, reducer);
     delete master;
