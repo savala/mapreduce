@@ -3,11 +3,17 @@ MapReduce for Stampede
 
 A C++ framework by Sai Avala and Sudheesh Katkam
 
-Documentation:
+To run,
 
 On Stampede:
 module load boost
-mpicxx -I${TACC_BOOST_INC} example.cxx
+??
 
 On Mac:
-mpic++ example.c++ /usr/local/opt/boost/lib/libboost_mpi-mt.a
+make matrix
+
+Boost MPI Library:
+http://www.boost.org/doc/libs/1_55_0/doc/html/mpi.html
+
+Google's MapReduce Paper:
+http://static.googleusercontent.com/media/research.google.com/en/us/archive/mapreduce-osdi04.pdf

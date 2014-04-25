@@ -1,7 +1,6 @@
-# include "mapreduce.h"
+#include <mapreduce.h>
 
 #include <vector>
-#include <map>
 #include <utility>
 
 typedef tuple<int, int> VL;
