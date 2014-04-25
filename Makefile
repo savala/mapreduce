@@ -6,5 +6,8 @@ charcount: mapreduce.h charcount.cxx
 hello: hello.cxx
 	mpicxx -g -O2 hello.cxx -L${MPI_LIB_PATH} -lboost_mpi-mt -lboost_serialization-mt -o hello.out
 
+matrix: matrix.cxx
+	mpicxx -g -O2 matrix.cxx -L${MPI_LIB_PATH} -lboost_mpi-mt -lboost_serialization-mt -o matrix.out
+
 clean:
 	/bin/rm -rf *.o *.out *.dSYM
