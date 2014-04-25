@@ -11,51 +11,45 @@ typedef vector<VL>      MV;
 typedef int             RK;
 typedef vector<int>     RV;
 
-typedef tuple<MK, MV>   MPAIR;
-typedef tuple<RK, RV>   RPAIR;
-
 class MatrixMaster : public Master<MK, MV, RK, RV> {
 
     virtual void initialize() {        
-        vector<MPAIR> list;
-        MPAIR listTuple;
+        vector<MPAIR> v;
+        MPAIR mp;
         
-        listTuple.first = 1;
-        MV tupleValues;
-        tupleValues.push_back(VL(7, 5));
-        tupleValues.push_back(VL(4, 1));
-        tupleValues.push_back(VL(2, 7));
-        listTuple.second = tupleValues;
+        mp.first = 1;
+        MV mv;
+        mv.push_back(VL(7, 5));
+        mv.push_back(VL(4, 1));
+        mv.push_back(VL(2, 7));
+        mp.second = mv;
+        v.push_back(mp);
+        
+        _map_container.push_back(v);
+        v.clear();
 
-        list.push_back(listTuple);
-        _map_container.push_back(list);
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(6, 5));
+        mp.second = mv;
+        v.push_back(mp);
 
-        list.clear();
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(3, 1));
+        mp.second = mv;
+        v.push_back(mp);
 
-        listTuple.first = 2;
-        tupleValues.clear();
-        tupleValues.push_back(VL(6, 5));
-        listTuple.second = tupleValues;
+        _map_container.push_back(v);
+        v.clear();
 
-        list.push_back(listTuple);
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(9, 7));
+        mp.second = mv;
+        v.push_back(mp);
 
-        listTuple.first = 2;
-        tupleValues.clear();
-        tupleValues.push_back(VL(3, 1));
-        listTuple.second = tupleValues;
-
-        list.push_back(listTuple);
-        _map_container.push_back(list);
-
-        list.clear();
-
-        listTuple.first = 2;
-        tupleValues.clear();
-        tupleValues.push_back(VL(9, 7));
-        listTuple.second = tupleValues;
-
-        list.push_back(listTuple);
-        _map_container.push_back(list);
+        _map_container.push_back(v);
     }
 
     virtual void finalize() const {
@@ -70,8 +64,8 @@ class MatrixMaster : public Master<MK, MV, RK, RV> {
 
 class MatrixMapper : public Mapper<MK, MV, RK, RV> {
 
-    virtual vector<RPAIR > map(vector<MPAIR> tuples) {
-        vector<RPAIR > result;
+    virtual vector<RPAIR> map(vector<MPAIR> tuples) {
+        vector<RPAIR> result;
         for (int i = 0; i < tuples.size(); ++i) {
             RK key = tuples[i].first;
             MV values = tuples[i].second;
@@ -96,10 +90,10 @@ class MatrixReducer : public Reducer<RK, RV> {
     virtual RPAIR reduce(RK key, vector<RV> values) {
         int sum = 0;
         for (int i = 0; i < values.size(); ++i) {
-            RV list = values[i];
+            RV rv = values[i];
 
-            for (int j = 0; j < list.size(); ++j) {
-                sum += list[j];                
+            for (int j = 0; j < rv.size(); ++j) {
+                sum += rv[j];                
             }
         }
 

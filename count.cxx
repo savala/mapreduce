@@ -4,26 +4,26 @@
 #include <map>
 #include <utility>
 
-typedef char          MK;
-typedef int           MV;
-typedef char          RK;
-typedef int           RV;
-
-typedef tuple<MK, MV> MPAIR;
-typedef tuple<RK, RV> RPAIR;
+typedef char MK;
+typedef int  MV;
+typedef char RK;
+typedef int  RV;
 
 class CharCountMaster : public Master<MK, MV, RK, RV> {
 
     virtual void initialize() {
         vector<MPAIR> v;
+        
         v.push_back(MPAIR('a', 1));
         v.push_back(MPAIR('a', 1));
         _map_container.push_back(v);
         v.clear();
+        
         v.push_back(MPAIR('b', 1));
         v.push_back(MPAIR('c', 1));
         _map_container.push_back(v);
         v.clear();
+        
         v.push_back(MPAIR('a', 1));
         v.push_back(MPAIR('d', 1));
         _map_container.push_back(v);
