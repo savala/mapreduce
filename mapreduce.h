@@ -80,13 +80,13 @@ class Master {
         }
 
     protected:
-        vector<tuple<MK, MV> > _map_container;
-        vector<tuple<RK, RV> > _result_container;
-        map  <RK, vector<RV> > _reduce_container;
+        vector<vector<tuple<MK, MV> > > _map_container;
+        vector<tuple<RK, RV> >          _result_container;
+        map   <RK, vector<RV> >         _reduce_container;
     
     public:
         Master() :
-            _map_container   (vector<tuple<MK, MV> >()),
+            _map_container   (vector<vector<tuple<MK, MV> > >()),
             _result_container(vector<tuple<RK, RV> >()),
             _reduce_container(map  <RK, vector<RV> >()),
             _free_processor  (1)
@@ -162,10 +162,8 @@ class Mapper {
             mpi::communicator world;
 
             vector<tuple<MK, MV> > tuples;
-            tuple<MK, MV> temp;             // !!
             vector<tuple<RK, RV> > results;
-            world.recv(ROOT, 0, temp);
-            tuples.push_back(temp);         // !!
+            world.recv(ROOT, 0, tuples);
             results = map(tuples);
             world.send(ROOT, 0, results);
         }
