@@ -8,10 +8,18 @@ class CharCountMaster : public Master<char, int, char, int> {
     public:
 
     virtual void initialize() {
-        _map_container.push_back(tuple<char, int>('a', 1));
-        _map_container.push_back(tuple<char, int>('a', 1));
-        _map_container.push_back(tuple<char, int>('b', 1));
-        _map_container.push_back(tuple<char, int>('c', 1));
+        vector<tuple<char, int> > v;
+        v.push_back(tuple<char, int>('a', 1));
+        v.push_back(tuple<char, int>('a', 1));
+        _map_container.push_back(v);
+        v.clear();
+        v.push_back(tuple<char, int>('b', 1));
+        v.push_back(tuple<char, int>('c', 1));
+        _map_container.push_back(v);
+        v.clear();
+        v.push_back(tuple<char, int>('a', 1));
+        v.push_back(tuple<char, int>('d', 1));
+        _map_container.push_back(v);
     }
 
     virtual void finalize() const {
