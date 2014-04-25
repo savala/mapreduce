@@ -57,7 +57,7 @@ class Master {
             mpi::communicator world;
 
             for (int i = 1; i < size; ++i) {
-                vector<tuple<RK, RV> > contribution;
+                vector<RPAIR> contribution;
                 
                 world.recv(i, 0, contribution);
                 for (int j = 0; j < contribution.size(); ++j) {
@@ -72,7 +72,7 @@ class Master {
             mpi::communicator world;
 
             for (int i = 1; i < size; ++i) {
-                tuple<RK, RV> contribution;
+                RPAIR contribution;
                 
                 world.recv(i, 0, contribution);
                 _result_container.push_back(contribution);
@@ -81,15 +81,18 @@ class Master {
         }
 
     protected:
-        vector<vector<tuple<MK, MV> > > _map_container;
-        vector<tuple<RK, RV> >          _result_container;
-        map   <RK, vector<RV> >         _reduce_container;
+        typedef tuple<MK, MV> MPAIR;
+        typedef tuple<RK, RV> RPAIR;
+
+        vector<vector<MPAIR> >  _map_container;
+        vector<RPAIR>           _result_container;
+        map   <RK, vector<RV> > _reduce_container;
     
     public:
         Master() :
-            _map_container   (vector<vector<tuple<MK, MV> > >()),
-            _result_container(vector<tuple<RK, RV> >()),
-            _reduce_container(map  <RK, vector<RV> >()),
+            _map_container   (vector<vector<MPAIR> >()),
+            _result_container(vector<RPAIR>()),
+            _reduce_container(map   <RK, vector<RV> >()),
             _free_processor  (1)
         { }
         
@@ -154,16 +157,20 @@ class Master {
 
 template<typename MK, typename MV, typename RK, typename RV>
 class Mapper {
+    protected:
+        typedef tuple<MK, MV> MPAIR;
+        typedef tuple<RK, RV> RPAIR;
+    
     public:    
         Mapper() { }
 
-        virtual vector<tuple<RK, RV> > map(vector<tuple<MK, MV> > tuples) = 0;
+        virtual vector<RPAIR> map(vector<MPAIR> tuples) = 0;
 
         void work() {
             mpi::communicator world;
 
-            vector<tuple<MK, MV> > tuples;
-            vector<tuple<RK, RV> > results;
+            vector<MPAIR> tuples;
+            vector<RPAIR> results;
             world.recv(ROOT, 0, tuples);
             results = map(tuples);
             world.send(ROOT, 0, results);
@@ -174,16 +181,19 @@ class Mapper {
 
 template<typename RK, typename RV>
 class Reducer {
+    protected:
+        typedef tuple<RK, RV> RPAIR;
+
     public:      
         Reducer() { }
 
-        virtual tuple<RK, RV> reduce(RK key, vector<RV> values) = 0;
+        virtual RPAIR reduce(RK key, vector<RV> values) = 0;
 
         void work() {
             mpi::communicator world;
 
             tuple<RK, vector<RV> > tuples;
-            tuple<RK, RV> result;
+            RPAIR result;
             world.recv(ROOT, 0, tuples);
             result = reduce(tuples.first, tuples.second);
             world.send(ROOT, 0, result);
