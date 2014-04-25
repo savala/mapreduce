@@ -5,7 +5,6 @@
 #include <utility>
 
 class CharCountMaster : public Master<char, int, char, int> {
-    public:
 
     virtual void initialize() {
         vector<tuple<char, int> > v;

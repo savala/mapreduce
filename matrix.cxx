@@ -5,16 +5,54 @@
 #include <utility>
 
 class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<int> > {
-    public:
 
-    virtual void initialize() {
+    virtual void initialize() {        
+        vector<tuple<int, vector<tuple<int, int> > > > list;
+        tuple<int, vector<tuple<int, int> > > listTuple;
+        
+        listTuple.first = 1;
+        vector<tuple<int, int> > tupleValues;
+        tupleValues.push_back(tuple<int, int>(7, 5));
+        tupleValues.push_back(tuple<int, int>(4, 1));
+        tupleValues.push_back(tuple<int, int>(2, 7));
+        listTuple.second = tupleValues;
 
+        list.push_back(listTuple);
+        _map_container.push_back(list);
+
+        list.clear();
+
+        listTuple.first = 2;
+        tupleValues.clear();
+        tupleValues.push_back(tuple<int, int>(6, 5));
+        listTuple.second = tupleValues;
+
+        list.push_back(listTuple);
+
+        listTuple.first = 2;
+        tupleValues.clear();
+        tupleValues.push_back(tuple<int, int>(3, 1));
+        listTuple.second = tupleValues;
+
+        list.push_back(listTuple);
+        _map_container.push_back(list);
+
+        list.clear();
+
+        listTuple.first = 2;
+        tupleValues.clear();
+        tupleValues.push_back(tuple<int, int>(9, 7));
+        listTuple.second = tupleValues;
+
+        list.push_back(listTuple);
+        _map_container.push_back(list);
     }
 
     virtual void finalize() const {
-        printf("Char counts: \n");
+        printf("Result: \n");
+        // vector<tuple<RK, RV> > _result_container;
         for (int i = 0; i < _result_container.size(); ++i) {
-            printf("%c:%d ", _result_container[i].first, _result_container[i].second);
+            printf("%d:%d ", _result_container[i].first, _result_container[i].second[0]);
         }
         printf("\n");
     }
@@ -22,8 +60,9 @@ class MatrixMaster : public Master<int, vector<tuple<int, int> >, int, vector<in
 
 class MatrixMapper : public Mapper<int, vector<tuple<int, int> >, int, vector<int> > {
 
-    vector<tuple<int, vector<int>>> map(vector<tuple<int, vector<tuple<int, int>>>> tuples) {
-        vector<tuple<int, vector<int>>> result;
+    // vector<tuple<RK, RV> > map(vector<tuple<MK, MV> > tuples)
+    vector<tuple<int, vector<int> > > map(vector<tuple<int, vector<tuple<int, int> > > > tuples) {
+        vector<tuple<int, vector<int> > > result;
         for (int i = 0; i < tuples.size(); ++i) {
             int key = tuples[i].first;
             vector<tuple<int, int> > values = tuples[i].second;
@@ -45,12 +84,20 @@ class MatrixMapper : public Mapper<int, vector<tuple<int, int> >, int, vector<in
 
 class MatrixReducer : public Reducer<int, vector<int> > {
 
-    tuple<int, int> reduce(int key, vector<int> values) {
+    // tuple<RK, RV> reduce(RK key, vector<RV> values)
+    tuple<int, vector<int> > reduce(int key, vector<vector<int> > values) {
         int sum = 0;
         for (int i = 0; i < values.size(); ++i) {
-            sum += values[i];
+            vector<int> list = values[i];
+
+            for (int j = 0; j < list.size(); ++j) {
+                sum += list[j];                
+            }
         }
-        return tuple<int, int>(key, sum);
+
+        vector<int> result;
+        result.push_back(sum);
+        return tuple<int, vector<int> >(key, result);
     }
 };
 
