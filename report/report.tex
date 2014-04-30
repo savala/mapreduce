@@ -32,12 +32,19 @@
 \newpage
 
 \section{Introduction}
+Most high performance computing systems are a connected cluster of inexpensive computers. These computers collectively solve computationally intensive problems, e.g. weather prediction. This distributed memory model allows for processors to run identical or different programs, each working on different chunks of problem/ data. This provides scalability: adding more processors to the system adds more units of computation. However, as there is no global memory for all processors, exchanging data becomes necessary, say near the borders of the data chunks. This communication is done explicitly through Message Passing Interface or MPI. Routines include Point-to-Point messages, collective messages, synchronization, etc. These routines are complex and programmers are required to learn the function signatures and the various parameters required. MApReduce for Stampede is a C++ library that provides an abstraction for programmers to focus on solving the problem rather than worry about the underlying communications among the processors. MARS is an abstraction over Boost.MPI which itself is an abstraction over MPI.
+
+\subsection{MapReduce}
 MapReduce is a programming paradigm that enables developers to take advantage of clusters that make the same operations on each element in a given dataset. With MapReduce, a developer can distribute data easily and apply the same computations without having to worry about the actual maintainence or synchronization. For our project, we decided to build a MapReduce API for C++. As the end result, the developers will only need to know how to formulate their algorithm and our API will handle the actual distribution of the data and the ending reduction.
 
+\subsection{Boost.MPI}
+Boost.MPI is a library for message passing in high-performance parallel applications. Unlike communication in threaded environments or using a shared-memory library, Boost.MPI processes can be spread across many different machines, possibly with different operating systems and underlying architectures. It is a C++-friendly interface to the standard Message Passing Interface (MPI), the most popular library interface for high-performance, distributed computing. This library provides an interface to MPI that better supports modern C++ development styles, including complete support for user-defined data types and C++ Standard Library types.
+
+\subsection{Problem}
+Although Boost.MPI provides a good abstraction, it still involves knowing MPI. 
 
 \section{Setup}
 \subsection{Constraints}
-%\subsubsection*{Phase 1}
 Given that we know that the MapReduce API will used so that the developer only needs to focus on formulating their algorithm instead of handling synchronization between processors, we had to make sure the MapReduce handled it for the developer. Since our API is meant for C++ developers, we used MPICH-2 (MPI) in order to maintain the computations across nodes within a cluster. As developers of the API we constrained the expectations of those who use this library to be able to write the actual computation that they would like to see on their data. For example, given a large list of numbers of size "n", the developer should understand what computation they want to be done on each element of the list. 
 \subsection{Modeling MapReduce}
 Our project, although universal, was designed to work with the Stampede Supercomputer Cluster. Earlier we stated that our MapReduce API will handle the distribution of data across multiple processes. To show how this is possible, let's list out a few definitions.
@@ -99,9 +106,12 @@ class CharCountReducer : public Reducer<RK, RV> {
 \end{verbatim}
 Since we have already split up the tuples in the data set, which is a string, our map() function will just output a character key and the initial value as 1. We use 1 as the default value because naturally that starting count number given an occurrence. After the map() function is applied to every item in the dataset, Master will go ahead and create a new pair such that all the common keys value pairs will be passed into reduce() as a single key and a list of values. reduce() in our case will taken in a key and list of values pair, sum up the occurrences, which is the list of values and then sends the final result back to Master.
 \section{Assumptions}
-RK needs to be hashable
+RK needs to be hashable. Enhancement: requires data to fit on one processors (master) which is sent to various  workers.
+
+\section{Performance}
+Boost.MPI performance. And performance of apps written wit
 
 \section{Conclusion}
-Done done done.
+MARS provides an abstraction where the programmer is unaware of the underlying complexity of making MPI function calls. Issue with a single master. Done done done.
 
 \end{document}
