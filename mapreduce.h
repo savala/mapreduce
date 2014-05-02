@@ -1,6 +1,7 @@
 #ifndef Mapreduce_h
 #define Mapreduce_h
 
+#include <stdio.h>
 #include <vector>
 #include <map>
 #include <utility>
