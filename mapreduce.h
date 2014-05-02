@@ -147,7 +147,7 @@ class Master {
             // REDUCE CLEAN UP
             receive_reduce_results(_free_processor);
 
-            for (int i = 0; i < size; ++i) {
+            for (int i = 1; i < size; ++i) {
                 world.send(i, 0, DONE);
             }
             printf("\n");
