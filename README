@@ -3,31 +3,15 @@ MapReduce for Stampede
 
 A C++ framework by Sai Avala and Sudheesh Katkam
 
-To run,
-
 On Stampede:
-module load boost
-??
+$ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/00434/eijkhout/boost/installation/lib
+$ make matrix
 
 On Mac:
-make matrix
+$ make matrix
 
 Boost MPI Library:
 http://www.boost.org/doc/libs/1_55_0/doc/html/mpi.html
 
 Google's MapReduce Paper:
 http://static.googleusercontent.com/media/research.google.com/en/us/archive/mapreduce-osdi04.pdf
-
------------------------------------------------------------------
-Looks like our boost was configured without mpi, but adding it doesn't seem hard.
- 
-Can you point your include & lib directives to subdirectories of 
- 
-/work/00434/eijkhout/boost/installation
- 
-There is only one mpi library that I can see, so you can add "-lboost_mpi" to your link line.
- 
-Let me know if there is a problem. I may have missed a permission of so.
- 
-Victor.
--------------------------------------------------------------------
