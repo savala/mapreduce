@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <utility>
-#include <stdlib.h> 
 #include <stdio.h>
 
 typedef tuple<int, int> VL;
