@@ -10,31 +10,36 @@ typedef int  RV;
 
 class CharCountMaster : public Master<MK, MV, RK, RV> {
 
-    virtual void initialize() {
-        vector<MPAIR> v;
-        
-        v.push_back(MPAIR('a', 1));
-        v.push_back(MPAIR('a', 1));
-        _map_container.push_back(v);
-        v.clear();
-        
-        v.push_back(MPAIR('b', 1));
-        v.push_back(MPAIR('c', 1));
-        _map_container.push_back(v);
-        v.clear();
-        
-        v.push_back(MPAIR('a', 1));
-        v.push_back(MPAIR('d', 1));
-        _map_container.push_back(v);
-    }
+    public:
+        CharCountMaster(int size):
+            Master(size)
+        { }
 
-    virtual void finalize() const {
-        printf("Char counts: \n");
-        for (int i = 0; i < _result_container.size(); ++i) {
-            printf("%c:%d ", _result_container[i].first, _result_container[i].second);
+        virtual void initialize() {
+            vector<MPAIR> v;
+            
+            v.push_back(MPAIR('a', 1));
+            v.push_back(MPAIR('a', 1));
+            _map_container.push_back(v);
+            v.clear();
+            
+            v.push_back(MPAIR('b', 1));
+            v.push_back(MPAIR('c', 1));
+            _map_container.push_back(v);
+            v.clear();
+            
+            v.push_back(MPAIR('a', 1));
+            v.push_back(MPAIR('d', 1));
+            _map_container.push_back(v);
         }
-        printf("\n");
-    }
+
+        virtual void finalize() const {
+            printf("Char counts: \n");
+            for (int i = 0; i < _result_container.size(); ++i) {
+                printf("%c:%d ", _result_container[i].first, _result_container[i].second);
+            }
+            printf("\n");
+        }
 };
 
 class CharCountMapper : public Mapper<MK, MV, RK, RV> {
@@ -55,9 +60,15 @@ class CharCountReducer : public Reducer<RK, RV> {
     }
 };
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc <= 1) {
+        cout << "Usage: ibrun count.out 16" << endl;
+        exit(1);
+    }
+    int size = atoi(argv[1]);
+
     JobClient<MK, MV, RK, RV>  jc;
-    Master   <MK, MV, RK, RV>* master  = new CharCountMaster();
+    Master   <MK, MV, RK, RV>* master  = new CharCountMaster(size);
     Mapper   <MK, MV, RK, RV>* mapper  = new CharCountMapper();
     Reducer  <RK, RV>*         reducer = new CharCountReducer();
 
