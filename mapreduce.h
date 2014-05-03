@@ -1,7 +1,6 @@
 #ifndef Mapreduce_h
 #define Mapreduce_h
 
-#include <stdio.h>
 #include <vector>
 #include <map>
 #include <utility>
@@ -16,6 +15,7 @@ namespace mpi = boost::mpi;
 
 template<typename Ftype, typename Stype>
 class tuple {
+    
     private:
         friend class boost::serialization::access;
 
@@ -50,6 +50,7 @@ class tuple {
 
 template<typename MK, typename MV, typename RK, typename RV>
 class Master {
+    
     private:
         int _free_processor;
         typedef typename map<RK, vector<RV> >::iterator it_type;
@@ -64,7 +65,7 @@ class Master {
                 for (int j = 0; j < contribution.size(); ++j) {
                     RK key = contribution[j].first;
                     _reduce_container[key].push_back(contribution[j].second);
-                    printf("*");
+                    cout << "*";
                 }
             }
         }
@@ -77,7 +78,7 @@ class Master {
                 
                 world.recv(i, 0, contribution);
                 _result_container.push_back(contribution);
-                printf("@");
+                cout << "@";
             }
         }
 
@@ -85,10 +86,10 @@ class Master {
         typedef tuple<MK, MV> MPAIR;
         typedef tuple<RK, RV> RPAIR;
 
-        vector<vector<MPAIR> >  _map_container;
-        vector<RPAIR>           _result_container;
+        vector<vector<MPAIR>  > _map_container;
         map   <RK, vector<RV> > _reduce_container;
-    
+        vector<RPAIR>           _result_container;
+        
     public:
         Master() :
             _map_container   (vector<vector<MPAIR> >()),
@@ -111,7 +112,7 @@ class Master {
             // MAP WORK
             while(task < msize) {
                 world.send(_free_processor, 0, MAPPER);
-                world.send(_free_processor, 0, _map_container[task]);
+                world.isend(_free_processor, 0, _map_container[task]);
                 
                 task++;
                 _free_processor++;
@@ -134,7 +135,7 @@ class Master {
                 work.second = it->second;
 
                 world.send(_free_processor, 0, REDUCER);
-                world.send(_free_processor, 0, work);
+                world.isend(_free_processor, 0, work);
 
                 _free_processor++;
                 it++;
@@ -150,7 +151,7 @@ class Master {
             for (int i = 1; i < size; ++i) {
                 world.send(i, 0, DONE);
             }
-            printf("\n");
+            cout << endl;
         }
 
         virtual ~Master() { }
@@ -158,6 +159,7 @@ class Master {
 
 template<typename MK, typename MV, typename RK, typename RV>
 class Mapper {
+
     protected:
         typedef tuple<MK, MV> MPAIR;
         typedef tuple<RK, RV> RPAIR;
@@ -182,6 +184,7 @@ class Mapper {
 
 template<typename RK, typename RV>
 class Reducer {
+
     protected:
         typedef tuple<RK, RV> RPAIR;
 
@@ -205,6 +208,7 @@ class Reducer {
 
 template<typename MK, typename MV, typename RK, typename RV>
 class JobClient {
+
     public:
         void run(Master<MK, MV, RK, RV>* master, Mapper<MK, MV, RK, RV>* mapper, Reducer<RK, RV>* reducer) {
             mpi::environment env;
@@ -213,7 +217,7 @@ class JobClient {
             int size = world.size();
             
             if (rank == ROOT) {
-                printf("Master %d with %d workers.\n", rank, size);
+                cout << "Master " << rank << " with " << size-1 << " workers." << endl;
                 master->initialize();
                 master->run();
                 master->finalize();

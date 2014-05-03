@@ -3,12 +3,16 @@ MapReduce for Stampede
 
 A C++ framework by Sai Avala and Sudheesh Katkam
 
-On Stampede:
+In mapreduce dir,
+
+On Stampede idev session:
 $ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/work/00434/eijkhout/boost/installation/lib
 $ make matrix
+$ ibrun matrix.out
 
 On Mac:
 $ make matrix
+$ mpirun -np 4 matrix.out
 
 Boost MPI Library:
 http://www.boost.org/doc/libs/1_55_0/doc/html/mpi.html

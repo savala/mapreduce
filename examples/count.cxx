@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <utility>
+#include <stdio.h>
 
 typedef char MK;
 typedef int  MV;
