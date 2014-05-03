@@ -161,6 +161,7 @@ class Master {
                 world.send(i, 0, DONE);
             }
             cout << endl;
+            _requests.clear();
         }
 
         virtual ~Master() { }
@@ -217,7 +218,7 @@ class Reducer {
 
 template<typename MK, typename MV, typename RK, typename RV>
 class JobClient {
-    
+
     public:
         void run(Master<MK, MV, RK, RV>* master, Mapper<MK, MV, RK, RV>* mapper, Reducer<RK, RV>* reducer) {
             mpi::environment env;
