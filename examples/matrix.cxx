@@ -3,6 +3,7 @@
 #include <vector>
 #include <utility>
 #include <stdlib.h> 
+#include <stdio.h>
 
 typedef tuple<int, int> VL;
 
@@ -15,7 +16,7 @@ class MatrixMaster : public Master<MK, MV, RK, RV> {
 
     public:
         MatrixMaster(int size) : 
-            Master(size)
+            Master<MK, MV, RK, RV>(size)
         { }
 
         virtual void initialize() {        
@@ -108,15 +109,9 @@ class MatrixReducer : public Reducer<RK, RV> {
     }
 };
 
-int main(int argc, char* argv[]) {
-    if (argc <= 1) {
-        cout << "Usage: ibrun matrix.out 16" << endl;
-        exit(1);
-    }
-    int size = atoi(argv[1]);
-
+int main() {
     JobClient<MK, MV, RK, RV>   jc;
-    Master   <MK, MV, RK, RV>*  master  = new MatrixMaster(size);
+    Master   <MK, MV, RK, RV>*  master  = new MatrixMaster(16);
     Mapper   <MK, MV, RK, RV>*  mapper  = new MatrixMapper();
     Reducer  <RK, RV>*          reducer = new MatrixReducer();
 

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <utility>
+#include <stdio.h>
 
 typedef char MK;
 typedef int  MV;
@@ -12,7 +13,7 @@ class CharCountMaster : public Master<MK, MV, RK, RV> {
 
     public:
         CharCountMaster(int size):
-            Master(size)
+            Master<MK, MV, RK, RV>(size)
         { }
 
         virtual void initialize() {
@@ -60,15 +61,9 @@ class CharCountReducer : public Reducer<RK, RV> {
     }
 };
 
-int main(int argc, char* argv[]) {
-    if (argc <= 1) {
-        cout << "Usage: ibrun count.out 16" << endl;
-        exit(1);
-    }
-    int size = atoi(argv[1]);
-
+int main() {
     JobClient<MK, MV, RK, RV>  jc;
-    Master   <MK, MV, RK, RV>* master  = new CharCountMaster(size);
+    Master   <MK, MV, RK, RV>* master  = new CharCountMaster(16);
     Mapper   <MK, MV, RK, RV>* mapper  = new CharCountMapper();
     Reducer  <RK, RV>*         reducer = new CharCountReducer();
 
