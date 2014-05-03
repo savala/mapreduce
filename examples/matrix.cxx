@@ -14,58 +14,53 @@ typedef vector<int>     RV;
 
 class MatrixMaster : public Master<MK, MV, RK, RV> {
 
-    public:
-        MatrixMaster(int size) : 
-            Master<MK, MV, RK, RV>(size)
-        { }
+    virtual void initialize() {        
+        vector<MPAIR> v;
+        MPAIR mp;
+        
+        mp.first = 1;
+        MV mv;
+        mv.push_back(VL(7, 5));
+        mv.push_back(VL(4, 1));
+        mv.push_back(VL(2, 7));
+        mp.second = mv;
+        v.push_back(mp);
+        
+        _map_container.push_back(v);
+        v.clear();
 
-        virtual void initialize() {        
-            vector<MPAIR> v;
-            MPAIR mp;
-            
-            mp.first = 1;
-            MV mv;
-            mv.push_back(VL(7, 5));
-            mv.push_back(VL(4, 1));
-            mv.push_back(VL(2, 7));
-            mp.second = mv;
-            v.push_back(mp);
-            
-            _map_container.push_back(v);
-            v.clear();
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(6, 5));
+        mp.second = mv;
+        v.push_back(mp);
 
-            mp.first = 2;
-            mv.clear();
-            mv.push_back(VL(6, 5));
-            mp.second = mv;
-            v.push_back(mp);
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(3, 1));
+        mp.second = mv;
+        v.push_back(mp);
 
-            mp.first = 2;
-            mv.clear();
-            mv.push_back(VL(3, 1));
-            mp.second = mv;
-            v.push_back(mp);
+        _map_container.push_back(v);
+        v.clear();
 
-            _map_container.push_back(v);
-            v.clear();
+        mp.first = 2;
+        mv.clear();
+        mv.push_back(VL(9, 7));
+        mp.second = mv;
+        v.push_back(mp);
 
-            mp.first = 2;
-            mv.clear();
-            mv.push_back(VL(9, 7));
-            mp.second = mv;
-            v.push_back(mp);
+        _map_container.push_back(v);
+    }
 
-            _map_container.push_back(v);
+    virtual void finalize() const {
+        printf("Result: \n");
+        
+        for (int i = 0; i < _result_container.size(); ++i) {
+            printf("%d:%d ", _result_container[i].first, _result_container[i].second[0]);
         }
-
-        virtual void finalize() const {
-            printf("Result: \n");
-            
-            for (int i = 0; i < _result_container.size(); ++i) {
-                printf("%d:%d ", _result_container[i].first, _result_container[i].second[0]);
-            }
-            printf("\n");
-        }
+        printf("\n");
+    }
 };
 
 class MatrixMapper : public Mapper<MK, MV, RK, RV> {
@@ -111,7 +106,7 @@ class MatrixReducer : public Reducer<RK, RV> {
 
 int main() {
     JobClient<MK, MV, RK, RV>   jc;
-    Master   <MK, MV, RK, RV>*  master  = new MatrixMaster(16);
+    Master   <MK, MV, RK, RV>*  master  = new MatrixMaster();
     Mapper   <MK, MV, RK, RV>*  mapper  = new MatrixMapper();
     Reducer  <RK, RV>*          reducer = new MatrixReducer();
 

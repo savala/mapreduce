@@ -90,14 +90,11 @@ class Master {
         map   <RK, vector<RV> > _reduce_container;
         vector<RPAIR>           _result_container;
         
-        vector<mpi::request>    _requests;
-    
     public:
-        Master(int size) :
+        Master() :
             _map_container   (vector<vector<MPAIR> >()),
             _result_container(vector<RPAIR>()),
             _reduce_container(map   <RK, vector<RV> >()),
-            _requests        (size),
             _free_processor  (1)
         { }
         
@@ -112,24 +109,20 @@ class Master {
             int task = 0;
             int msize = _map_container.size();
 
-            mpi::request *r = &_requests[0];
-
             // MAP WORK
             while(task < msize) {
                 world.send(_free_processor, 0, MAPPER);
-                r[_free_processor] = world.isend(_free_processor, 0, _map_container[task]);
+                world.isend(_free_processor, 0, _map_container[task]);
                 
                 task++;
                 _free_processor++;
                 if(_free_processor == size) {
-                    mpi::wait_all(r + 1, r + size);
                     receive_map_results(size);                    
                     _free_processor = 1;
                 }
             }
 
             // MAP CLEAN UP
-            mpi::wait_all(r + 1, r + _free_processor);
             receive_map_results(_free_processor);
 
             it_type it = _reduce_container.begin();
@@ -142,26 +135,23 @@ class Master {
                 work.second = it->second;
 
                 world.send(_free_processor, 0, REDUCER);
-                r[_free_processor] = world.isend(_free_processor, 0, work);
+                world.isend(_free_processor, 0, work);
 
                 _free_processor++;
                 it++;
                 if(_free_processor == size) {
-                    mpi::wait_all(r + 1, r + size);
                     receive_reduce_results(size);
                     _free_processor = 1;
                 }
             }
 
             // REDUCE CLEAN UP
-            mpi::wait_all(r + 1, r + _free_processor);
             receive_reduce_results(_free_processor);
 
             for (int i = 1; i < size; ++i) {
                 world.send(i, 0, DONE);
             }
             cout << endl;
-            _requests.clear();
         }
 
         virtual ~Master() { }
